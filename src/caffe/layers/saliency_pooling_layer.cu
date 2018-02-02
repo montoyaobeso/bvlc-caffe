@@ -12,7 +12,6 @@
 
 namespace caffe {
 
-
   template <typename Dtype>
   __global__ void SalPoolForward_SaliencyWeighting(const int nthreads,
       const Dtype* const image_data, const Dtype* const saliency_data,
@@ -228,6 +227,7 @@ void SaliencyPoolingLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom
     // 0 = Saliency Weighting           (SAL: Feat*Salvals,             NON-SAL: Zero)
     // 1 = RandomSampling               (SAL: MaxPooling,               NON-SAL: Min value) - Using Ps (Weibull distribution)
     // 2 = RandomSampling + Weighting   (SAL: MaxPooling*SalientValue   NON-SAL: Min value) - Using Ps (Weibull distribution)
+
     switch (PoolMethod) {
       case 0:
       // CUDA Routine for SalPoolForward_Random_Sampling
