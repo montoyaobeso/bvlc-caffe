@@ -103,7 +103,7 @@ void SGDSolver<Dtype>::ApplyUpdate() {
   Dtype rate = GetLearningRate();
   if (this->param_.display() && this->iter_ % this->param_.display() == 0) {
     LOG_IF(INFO, Caffe::root_solver()) << "Iteration " << this->iter_
-        << ", lr = " << rate;
+        << ", lr = " << rate << ", (Gamma = " << this->param_.gamma() << ")";
   }
   ClipGradients();
   for (int param_id = 0; param_id < this->net_->learnable_params().size();
