@@ -15,26 +15,20 @@ def parse_log(log_file):
         log = log_file2.read()
 
     # Train losses
-    train_loss_pattern = r"Training:\tIteration = (?P<iter_num>\d+), \tloss = (?P<loss>[0-9]*[.][0-9]*)"
+    train_loss_pattern = r"Training:\tIteration = (?P<iter_num>\d+), \tloss = (?P<loss>[0-9]*[.][0-9]*), \tlr = (?P<acc>[0-9]*[.][0-9]*)"
     train_loss_iterations = []
     train_losses = []
+    learning_rate = []
 
     for r in re.findall(train_loss_pattern, log):
+        #print r
         train_loss_iterations.append(int(r[0]))
         train_losses.append(float(r[1]))
+        learning_rate.append(float(r[2]))
 
     train_loss_iterations = np.array(train_loss_iterations)
     train_losses = np.array(train_losses)
-
-    # Learning rate
-    lr_pattern = r"Iteration (?P<iter_num>\d+), lr = (?P<lr>[0-9]*[.][0-9]*)"
-    learning_rate = []
-
-    for r in re.findall(lr_pattern, log):
-        learning_rate.append(float(r[1]))
-
     learning_rate = np.array(learning_rate)
-
 
     # Test data
     test_pattern =  r"Testing:\tIteration = (?P<iter_num>\d+), \tloss = (?P<loss>[0-9]*[.][0-9]*), \taccuracy = (?P<acc>[0-9]*[.][0-9]*)"
@@ -52,16 +46,17 @@ def parse_log(log_file):
     test_losses = np.array(test_losses)
     test_accuracy = np.array(test_accuracy)
 
-    return train_loss_iterations, train_losses, test_iterations, test_losses, test_accuracy, learning_rate
+    return train_loss_iterations, train_losses, learning_rate, test_iterations, test_losses, test_accuracy
 
 if __name__ == '__main__':
 
     text_file = sys.argv[1]
-    (train_loss_iterations, train_losses, test_iterations, test_losses, test_accuracy, learning_rate) = parse_log(text_file)
+    (train_loss_iterations, train_losses, learning_rate, test_iterations, test_losses, test_accuracy) = parse_log(text_file)
 
-    plot_interval = 1
+    plot_interval = 5
     train_loss_iterations = train_loss_iterations[0::plot_interval]
     train_losses = train_losses[0::plot_interval]
+    learning_rate = learning_rate[0::plot_interval]
 
     max_acc     = max(test_accuracy)
     max_acc_idx = test_iterations[np.where(test_accuracy == max_acc)[0]][0]
@@ -71,6 +66,7 @@ if __name__ == '__main__':
 
 
     # Plot loss-accuracy curves
+    #plt.figure(figsize=(4,2.5))
     host = host_subplot(111, axes_class=AA.Axes)
 
     host.clear()
@@ -95,18 +91,20 @@ if __name__ == '__main__':
     p3, = par1.plot(test_iterations, test_accuracy, label="Accuracy", linewidth=1.5)
 
     par1.set_ylim(0, 1)
-    host.legend(loc='lower left', ncol=1, fancybox=False, shadow=True)
-    # # Plot learning rate
-    # fig = plt.figure()
-    # ax = plt.subplot(111)
-    # ax.plot(learning_rate, 'b-')
-    # ax.set_ylim(0, np.max(learning_rate) + np.max(learning_rate)*0.01)
-    # ax.set_xlim(0, len(learning_rate))
-    # ax.set_xlabel('Iterations')
-    # ax.set_ylabel('Learning rate')
-    # ax.set_xticklabels(["$%d$"%f for f in np.arange(0, np.max(train_loss_iterations), len(train_loss_iterations))])
-    # ax.set_title("Learning rate decay curve")
+    #host.legend(loc='lower left', ncol=1, fancybox=False, shadow=True)
 
+    '''
+    # Plot learning rate
+    fig = plt.figure()
+    ax = plt.subplot(111)
+    ax.plot(train_loss_iterations,learning_rate, 'b-')
+    ax.set_ylim(0, np.max(learning_rate) + np.max(learning_rate)*0.01)
+    ax.set_xlim(0, np.max(train_loss_iterations))
+    ax.set_xlabel('Iterations')
+    ax.set_ylabel('Learning rate')
+    #ax.set_xticklabels(["$%d$"%f for f in np.arange(0, np.max(train_loss_iterations), len(train_loss_iterations))])
+    ax.set_title("Learning rate decay curve")
+    '''
     plt.show()
 
 
