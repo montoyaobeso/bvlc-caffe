@@ -34,7 +34,7 @@ Dtype SGDSolver<Dtype>::GetLearningRate() {
     rate = this->param_.base_lr() *
         pow(this->param_.gamma(), this->current_step_);
   } else if (lr_policy == "exp") {
-    rate = this->param_.base_lr() * pow(this->param_.gamma(), this->iter_);
+    rate = this->param_.base_lr() * pow(this->param_.gamma(), (100.0 * (Dtype(this->iter_) / Dtype(this->param_.max_iter()))));
   } else if (lr_policy == "inv") {
     rate = this->param_.base_lr() *
         pow(Dtype(1) + this->param_.gamma() * this->iter_,
