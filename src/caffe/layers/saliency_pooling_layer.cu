@@ -75,7 +75,7 @@ CUDA_KERNEL_LOOP(index, nthreads) {
   int wstart = pw * stride_w;
   int hend = min(hstart + kernel_h, height);
   int wend = min(wstart + kernel_w, width);
-  //const int pool_size = (hend - hstart) * (wend - wstart);
+  const int pool_size = (hend - hstart) * (wend - wstart);
   hstart = max(hstart, 0);
   wstart = max(wstart, 0);
   hend = min(hend, height);
@@ -85,8 +85,8 @@ CUDA_KERNEL_LOOP(index, nthreads) {
   const Dtype* const saliency_bottom_slice = saliency_data + (n * channels + c) * height * width;
 
   // Weibull distribution
-  float lambda = 0.5;
-  float k = 4.0;
+  float lambda = 0.3;
+  float k = 3.5;
 
   Dtype Ps = lambda * pow(-log(1-numbers[index]), (1/k));
 
@@ -105,21 +105,24 @@ CUDA_KERNEL_LOOP(index, nthreads) {
       }
     }
     top_data[index] = maxval; // * saliency_bottom_slice[validx];
+    //top_data[index] = 1;
     //printf("Index:%d \t MaxVal:%f \t Salval:%d, Rand:%f\t (Max)\n", index, maxval, salval, Ps);
   }
   else{
     // Compute min val
-    float minval = FLT_MAX;
+    //float meanval = FLT_MAX;
+    float meanval = 0;
     for (int h = hstart; h < hend; ++h) {
       for (int w = wstart; w < wend; ++w) {
-        if (image_bottom_slice[h * width + w] < minval){
-          minval = image_bottom_slice[h * width + w];
-          validx =  h * width + w;
-        }
+        //if (image_bottom_slice[h * width + w] < meanval && image_bottom_slice[h * width + w] >= 0){
+          meanval += image_bottom_slice[h * width + w];
+          validx = ((hend-hstart)/2)+hstart * width + ((wend-wstart)/2)+wstart;
+        //}
       }
     }
-    top_data[index] = minval;
-    //printf("Index:%d \t AveVal:%f \t Salval:%f, Rand:%f\t (Average)\n", index, minval, salval, Ps);
+    top_data[index] = (meanval / pool_size);
+    //top_data[index] = 0;
+    //printf("Index:%d \t AveVal:%f \t Salval:%f, Rand:%f\t (Average)\n", index, meanval, salval, Ps);
   }
   if (mask) {
     mask[index] = validx;
@@ -145,7 +148,7 @@ CUDA_KERNEL_LOOP(index, nthreads) {
   int wstart = pw * stride_w;
   int hend = min(hstart + kernel_h, height);
   int wend = min(wstart + kernel_w, width);
-  //const int pool_size = (hend - hstart) * (wend - wstart);
+  const int pool_size = (hend - hstart) * (wend - wstart);
   hstart = max(hstart, 0);
   wstart = max(wstart, 0);
   hend = min(hend, height);
@@ -155,8 +158,8 @@ CUDA_KERNEL_LOOP(index, nthreads) {
   const Dtype* const saliency_bottom_slice = saliency_data + (n * channels + c) * height * width;
 
   // Weibull distribution
-  float lambda = 0.5;
-  float k = 4.0;
+  float lambda = 0.3;
+  float k = 4;
 
   Dtype Ps = lambda * pow(-log(1-numbers[index]), (1/k));
 
@@ -175,20 +178,23 @@ CUDA_KERNEL_LOOP(index, nthreads) {
       }
     }
     top_data[index] = maxval * saliency_bottom_slice[validx];
+    //top_data[index] = 1;
     //printf("Index:%d \t MaxVal:%f \t Salval:%d, Rand:%f\t (Max)\n", index, maxval, salval, Ps);
   }
   else{
     // Compute min val
-    float minval = FLT_MAX;
+    //float minval = FLT_MAX;
+    float minval = 0;
     for (int h = hstart; h < hend; ++h) {
       for (int w = wstart; w < wend; ++w) {
-        if (image_bottom_slice[h * width + w] < minval){
-          minval = image_bottom_slice[h * width + w];
-          validx =  h * width + w;
-        }
+        //if (image_bottom_slice[h * width + w] < minval && image_bottom_slice[h * width + w] >= 0){
+          minval += image_bottom_slice[h * width + w];
+          validx = ((hend-hstart)/2)+hstart * width + ((wend-wstart)/2)+wstart;
+        //}
       }
     }
-    top_data[index] = minval * saliency_bottom_slice[validx];;
+    top_data[index] = (minval / pool_size) * saliency_bottom_slice[validx];
+    //top_data[index] = 0;
     //printf("Index:%d \t AveVal:%f \t Salval:%f, Rand:%f\t (Average)\n", index, minval, salval, Ps);
   }
   if (mask) {
