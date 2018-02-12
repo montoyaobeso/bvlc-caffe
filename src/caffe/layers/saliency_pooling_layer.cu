@@ -2,11 +2,6 @@
 #include <cfloat>
 #include <vector>
 #include <string>
-
-#include <unistd.h>
-#include <stdio.h>
-#include "caffe/blob.hpp"
-
 #include "caffe/layers/saliency_pooling_layer.hpp"
 #include "caffe/util/math_functions.hpp"
 
@@ -37,7 +32,6 @@ namespace caffe {
       float salval = 0;
       const Dtype* const bottom_slice = image_data + (n * channels + c) * height * width;
       const Dtype* const saliency_bottom_slice = saliency_data + (n * channels + c) * height * width;
-
       for (int h = hstart; h < hend; ++h) {
         for (int w = wstart; w < wend; ++w) {
           aveval += bottom_slice[h * width + w] * saliency_bottom_slice[h * width + w];
@@ -45,7 +39,6 @@ namespace caffe {
           salval += saliency_bottom_slice[h * width + w];
         }
       }
-      //printf("Index:%d \t Eval:%f \t Salval:%f\n", index, aveval, salval);
       if (salval == 0) {
         top_data[index] = 0;
       } else {
@@ -75,26 +68,21 @@ CUDA_KERNEL_LOOP(index, nthreads) {
   int wstart = pw * stride_w;
   int hend = min(hstart + kernel_h, height);
   int wend = min(wstart + kernel_w, width);
-  const int pool_size = (hend - hstart) * (wend - wstart);
+  //const int pool_size = (hend - hstart) * (wend - wstart);
   hstart = max(hstart, 0);
   wstart = max(wstart, 0);
   hend = min(hend, height);
   wend = min(wend, width);
-
   const Dtype* const image_bottom_slice = image_data + (n * channels + c) * height * width;
   const Dtype* const saliency_bottom_slice = saliency_data + (n * channels + c) * height * width;
-
   // Weibull distribution
   float lambda = 0.3;
-  float k = 3.5;
-
+  float k = 4.5;
   Dtype Ps = lambda * pow(-log(1-numbers[index]), (1/k));
-
-  // Saliency value at index position
   Dtype salval = saliency_bottom_slice[((hend-hstart)/2)+hstart * width + ((wend-wstart)/2)+wstart];
   int validx = -1;
+  // USE MAX VALUE FOR SALIENT REGIONS
   if (Ps < salval){
-    // Compute MaxPooling
     Dtype maxval = -FLT_MAX;
     for (int h = hstart; h < hend; ++h) {
       for (int w = wstart; w < wend; ++w) {
@@ -105,24 +93,19 @@ CUDA_KERNEL_LOOP(index, nthreads) {
       }
     }
     top_data[index] = maxval; // * saliency_bottom_slice[validx];
-    //top_data[index] = 1;
-    //printf("Index:%d \t MaxVal:%f \t Salval:%d, Rand:%f\t (Max)\n", index, maxval, salval, Ps);
   }
+  // USE MIN VALUE FOR NON SALIENT REGIONS
   else{
-    // Compute min val
-    //float meanval = FLT_MAX;
-    float meanval = 0;
+    float minval = FLT_MAX;
     for (int h = hstart; h < hend; ++h) {
       for (int w = wstart; w < wend; ++w) {
-        //if (image_bottom_slice[h * width + w] < meanval && image_bottom_slice[h * width + w] >= 0){
-          meanval += image_bottom_slice[h * width + w];
-          validx = ((hend-hstart)/2)+hstart * width + ((wend-wstart)/2)+wstart;
-        //}
+        if (image_bottom_slice[h * width + w] < minval){
+          minval = image_bottom_slice[h * width + w];
+          validx = h * width + w;
+        }
       }
     }
-    top_data[index] = (meanval / pool_size);
-    //top_data[index] = 0;
-    //printf("Index:%d \t AveVal:%f \t Salval:%f, Rand:%f\t (Average)\n", index, meanval, salval, Ps);
+    top_data[index] = minval;
   }
   if (mask) {
     mask[index] = validx;
@@ -148,26 +131,19 @@ CUDA_KERNEL_LOOP(index, nthreads) {
   int wstart = pw * stride_w;
   int hend = min(hstart + kernel_h, height);
   int wend = min(wstart + kernel_w, width);
-  const int pool_size = (hend - hstart) * (wend - wstart);
+  //const int pool_size = (hend - hstart) * (wend - wstart);
   hstart = max(hstart, 0);
   wstart = max(wstart, 0);
   hend = min(hend, height);
   wend = min(wend, width);
-
   const Dtype* const image_bottom_slice = image_data + (n * channels + c) * height * width;
   const Dtype* const saliency_bottom_slice = saliency_data + (n * channels + c) * height * width;
-
-  // Weibull distribution
   float lambda = 0.3;
   float k = 4;
-
   Dtype Ps = lambda * pow(-log(1-numbers[index]), (1/k));
-
-  // Saliency value at index position
   Dtype salval = saliency_bottom_slice[((hend-hstart)/2)+hstart * width + ((wend-wstart)/2)+wstart];
   int validx = -1;
   if (Ps < salval){
-    // Compute MaxPooling
     Dtype maxval = -FLT_MAX;
     for (int h = hstart; h < hend; ++h) {
       for (int w = wstart; w < wend; ++w) {
@@ -178,25 +154,19 @@ CUDA_KERNEL_LOOP(index, nthreads) {
       }
     }
     top_data[index] = maxval * saliency_bottom_slice[validx];
-    //top_data[index] = 1;
-    //printf("Index:%d \t MaxVal:%f \t Salval:%d, Rand:%f\t (Max)\n", index, maxval, salval, Ps);
   }
   else{
-    // Compute min val
-    //float minval = FLT_MAX;
-    float minval = 0;
-    for (int h = hstart; h < hend; ++h) {
-      for (int w = wstart; w < wend; ++w) {
-        //if (image_bottom_slice[h * width + w] < minval && image_bottom_slice[h * width + w] >= 0){
-          minval += image_bottom_slice[h * width + w];
-          validx = ((hend-hstart)/2)+hstart * width + ((wend-wstart)/2)+wstart;
-        //}
+      float minval = FLT_MAX;
+      for (int h = hstart; h < hend; ++h) {
+        for (int w = wstart; w < wend; ++w) {
+          if (image_bottom_slice[h * width + w] < minval){
+            minval = image_bottom_slice[h * width + w];
+            validx = h * width + w;
+          }
+        }
       }
+      top_data[index] = minval;
     }
-    top_data[index] = (minval / pool_size) * saliency_bottom_slice[validx];
-    //top_data[index] = 0;
-    //printf("Index:%d \t AveVal:%f \t Salval:%f, Rand:%f\t (Average)\n", index, minval, salval, Ps);
-  }
   if (mask) {
     mask[index] = validx;
   } else {
@@ -212,28 +182,22 @@ void SaliencyPoolingLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom
     const Dtype* saliency_data = bottom[1]->gpu_data();
     Dtype* top_data = top[0]->mutable_gpu_data();
     int count = top[0]->count();
-
     // We'll output the mask to top[1] if it's of size >1.
     const bool use_top_mask = top.size() > 1;
     int* mask = NULL;
     Dtype* top_mask = NULL;
-
     if (use_top_mask) {
       top_mask = top[1]->mutable_gpu_data();
     } else {
       mask = max_idx_.mutable_gpu_data();
     }
-
     // Generate random numbers
     const float lower = 0.0;
     const float upper = 1.0;
-    //Blob<float>* rands = new Blob<float>(bottom[0]->num(), bottom[0]->channels(), bottom[0]->height(), bottom[0]->width());
     caffe_gpu_rng_uniform(bottom[0]->count(), lower, upper, randoms_.mutable_gpu_data());
-
     // 0 = Saliency Weighting           (SAL: Feat*Salvals,             NON-SAL: Zero)
     // 1 = RandomSampling               (SAL: MaxPooling,               NON-SAL: Min value) - Using Ps (Weibull distribution)
     // 2 = RandomSampling + Weighting   (SAL: MaxPooling*SalientValue   NON-SAL: Min value) - Using Ps (Weibull distribution)
-
     switch (PoolMethod) {
       case 0:
       // CUDA Routine for SalPoolForward_Random_Sampling
@@ -310,11 +274,9 @@ __global__ void SalPoolBackward(const int nthreads, const Dtype* const top_diff,
 template <typename Dtype>
 void SaliencyPoolingLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
       const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom) {
-
   if (!propagate_down[0]) {
     return;
   }
-
   const Dtype* top_diff = top[0]->gpu_diff();
   Dtype* bottom_diff = bottom[0]->mutable_gpu_diff();
   const int count = bottom[0]->count();
@@ -330,7 +292,6 @@ void SaliencyPoolingLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
   } else {
     mask = max_idx_.gpu_data();
   }
-
   // NOLINT_NEXT_LINE(whitespace/operators)
   SalPoolBackward<Dtype><<<CAFFE_GET_BLOCKS(count), CAFFE_CUDA_NUM_THREADS>>>(
       count, top_diff, mask, top_mask, top[0]->num(), channels_,
